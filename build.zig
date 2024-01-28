@@ -1,12 +1,11 @@
 const std = @import("std");
-const Builder = std.build.Builder;
 const builtin = @import("builtin");
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
     const ecs_module = b.addModule("zig-ecs", .{
-        .source_file = std.build.FileSource{ .path = "src/ecs.zig" },
+        .root_source_file = .{ .path = "src/ecs.zig" },
     });
 
     const examples = [_][2][]const u8{
@@ -21,12 +20,13 @@ pub fn build(b: *Builder) void {
 
         var exe = b.addExecutable(.{
             .name = name,
-            .root_source_file = std.build.FileSource{ .path = source },
+            .root_source_file = .{ .path = source },
             .optimize = optimize,
+            .target = target,
         });
         // exe.setOutputDir(std.fs.path.join(b.allocator, &[_][]const u8{ b.cache_root, "bin" }) catch unreachable);
         // exe.output_dirname_source = .{ .path = std.fs.path.join(b.allocator, &[_][]const u8{ b.cache_root.path.?, "bin" }) catch unreachable, .step = &exe.step };
-        exe.addModule("ecs", ecs_module);
+        exe.root_module.addImport("ecs", ecs_module);
         exe.linkLibC();
 
         const docs = exe;
@@ -49,7 +49,7 @@ pub fn build(b: *Builder) void {
 
     // internal tests
     const internal_test = b.addTest(.{
-        .root_source_file = std.build.FileSource{ .path = "src/tests.zig" },
+        .root_source_file = .{ .path = "src/tests.zig" },
         .optimize = optimize,
         .target = target,
         .name = "internal_tests",
@@ -58,12 +58,12 @@ pub fn build(b: *Builder) void {
 
     // public api tests
     const public_test = b.addTest(.{
-        .root_source_file = std.build.FileSource{ .path = "tests/tests.zig" },
+        .root_source_file = .{ .path = "tests/tests.zig" },
         .optimize = optimize,
         .target = target,
         .name = "public_tests",
     });
-    public_test.addModule("ecs", ecs_module);
+    public_test.root_module.addImport("ecs", ecs_module);
     b.installArtifact(public_test);
 
     const test_cmd = b.step("test", "Run the tests");
@@ -86,7 +86,7 @@ pub fn getModule(comptime prefix_path: []const u8) std.build.Module {
 }
 
 /// prefix_path is used to add package paths. It should be the the same path used to include this build file
-pub fn linkArtifact(b: *Builder, artifact: *std.build.LibExeObjStep, _: std.build.Target, lib_type: LibType, comptime prefix_path: []const u8) void {
+pub fn linkArtifact(b: *std.Build, artifact: *std.build.LibExeObjStep, _: std.build.Target, lib_type: LibType, comptime prefix_path: []const u8) void {
     const optimize = b.standardOptimizeOption(.{});
     switch (lib_type) {
         .static => {
@@ -104,5 +104,5 @@ pub fn linkArtifact(b: *Builder, artifact: *std.build.LibExeObjStep, _: std.buil
         else => {},
     }
 
-    artifact.addModule(getModule(prefix_path));
+    artifact.root_module.addImport(getModule(prefix_path));
 }
